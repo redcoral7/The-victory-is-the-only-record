@@ -1,5 +1,6 @@
 const { useState, useEffect, useRef } = React;
 const { createClient } = supabase;
+
 const SUPABASE_URL = 'https://vvvsuoadoawdivzyjmnh.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_csF0Yu6fNHfJy2VhNmL1ZA_mkxPGoTP';
 const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -70,7 +71,7 @@ function App() {
     const { data, error } = await supabaseClient
       .from('shop_items')
       .select('*')
-      .order('price', { ascending: true });
+      .order('price', { ascending: false });
     if (!error) setShopItems(data || []);
   };
 
@@ -183,13 +184,8 @@ function App() {
     if (isGift) {
       if (!mailForm.targetUser) return alert('선물할 대상을 선택해주세요.');
       if (!mailForm.selectedGiftItem) return alert('사용할 아이템을 선택해주세요.');
-      
-      // 인벤토리에서 선택한 아이템이 있는지 정확히 확인
       targetInvItem = inventory.find(i => i.item_name === mailForm.selectedGiftItem);
-      
-      if (!targetInvItem) {
-        return alert('사용할 상품이 없습니다. 상점에서 구매해주시길 바랍니다.');
-      }
+      if (!targetInvItem) return alert('사용할 상품이 없습니다. 상점에서 구매해주시길 바랍니다.');
     }
 
     setIsUploading(true);
@@ -214,20 +210,13 @@ function App() {
       }]);
 
       if (!error) {
-        // --- [수정] 아이템 삭제 로직 강화 ---
         if (isGift && targetInvItem) {
           const { error: deleteError } = await supabaseClient
             .from('user_inventory')
             .delete()
-            .eq('id', targetInvItem.id); // ID 기반으로 정확히 삭제
-          
-          if (deleteError) {
-             console.error('아이템 삭제 실패:', deleteError);
-          } else {
-             fetchInventory(); // 인벤토리 상태 갱신
-          }
+            .eq('id', targetInvItem.id);
+          if (!deleteError) fetchInventory();
         }
-        
         alert('전송 완료'); 
         setIsMailFormOpen(false); 
         setSelectedFile(null); 
@@ -288,10 +277,9 @@ function App() {
           ) : <button onClick={() => setIsLoginOpen(true)} className="text-red-700 font-black text-[11px] border border-red-900 px-8 py-2 hover:bg-red-900 hover:text-white transition-all duration-300 italic tracking-[0.2em]">LOGIN</button>}
         </div>
       </nav>
-{/* --- [수정] 메인 컨텐츠 영역: 다중 조건부 렌더링 --- */}
-      <div>
+<div className="relative">
         {view === 'home' && (
-            <main key="shop-view" className="max-w-7xl mx-auto pt-24 px-8 pb-32 animate-in slide-in-from-bottom-8 duration-700">
+          <main key="home-view" className="flex flex-col items-center justify-center pt-60 text-center px-6 animate-in fade-in zoom-in-95 duration-1000">
             <h1 className="text-[90px] font-black text-white italic tracking-tighter leading-none mb-6 uppercase">"Arena Never Sleeps"</h1>
             <div className="w-24 h-[1px] bg-red-900 mb-8"></div>
             <p className="text-zinc-700 italic text-xl tracking-[0.3em] uppercase">The victory is the only record.</p>
@@ -299,7 +287,7 @@ function App() {
         )}
 
         {view === 'shop' && (
-          <main className="max-w-7xl mx-auto pt-24 px-8 pb-32 animate-in slide-in-from-bottom-12 duration-700 slide-in-from-bottom-full">
+          <main key="shop-view" className="max-w-7xl mx-auto pt-24 px-8 pb-32 animate-in slide-in-from-bottom-8 duration-700">
             <div className="flex justify-between items-end mb-16 border-l-4 border-red-900 pl-8 py-2">
               <div>
                 <h2 className="text-6xl font-black text-white italic tracking-tighter uppercase mb-2">Black Market</h2>
@@ -348,11 +336,13 @@ function App() {
         )}
       </div>
 
+      {/* --- 모달들: 반드시 하나의 부모 <div> 안에 포함되어야 함 --- */}
       <DuelRequestModal 
-        isOpen={isDuelModalOpen} mailData={pendingDuel}
-        onAccept={(id) => handleDecision(id, '서명완료')} onReject={(id) => handleDecision(id, '거절')}
+        isOpen={isDuelModalOpen} mailData={pendingDuel} 
+        onAccept={(id) => handleDecision(id, '서명완료')} onReject={(id) => handleDecision(id, '거절')} 
       />
 
+      {/* --- 프로필 아카이브 모달 --- */}
       {isUserProfileOpen && user && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/98 p-4 backdrop-blur-3xl">
           <div className="bg-[#050505] border-2 border-red-700 w-full max-w-2xl p-1 shadow-2xl animate-in zoom-in-95">
@@ -412,6 +402,7 @@ function App() {
         </div>
       )}
 
+      {/* --- 관리자 메일함 모달 --- */}
       {isAdminMailOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/98 p-4 backdrop-blur-md">
           <div className="bg-black border-2 border-red-700 w-full max-w-6xl h-[850px] flex flex-col shadow-2xl">
@@ -474,6 +465,7 @@ function App() {
         </div>
       )}
 
+      {/* --- 유저 관리 모달 --- */}
       {isUserMgmtOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-4 backdrop-blur-md">
           <div className="bg-[#050505] border-2 border-red-700 w-full max-w-5xl h-[80vh] flex flex-col shadow-[0_0_50px_rgba(185,28,28,0.2)]">
@@ -505,6 +497,7 @@ function App() {
         </div>
       )}
 
+      {/* --- 로그인 모달 --- */}
       {isLoginOpen && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/98 p-4 backdrop-blur-3xl animate-in fade-in">
           <div className="w-96 p-16 border border-red-950 bg-black text-center animate-in slide-in-from-bottom-8">
@@ -518,6 +511,7 @@ function App() {
         </div>
       )}
 
+      {/* --- 메일 전송 폼 모달 --- */}
       {isMailFormOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/98 p-4 backdrop-blur-md">
           <div className="bg-[#050505] border border-red-900/40 w-full max-w-xl p-1 shadow-2xl">
@@ -576,6 +570,7 @@ function App() {
         </div>
       )}
 
+      {/* --- 상점 아이템 상세 모달 --- */}
       {selectedItem && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/98 p-4 backdrop-blur-2xl">
           <div className="bg-black border border-red-900 w-full max-w-2xl p-12 relative animate-in zoom-in-95">
@@ -592,6 +587,7 @@ function App() {
         </div>
       )}
 
+      {/* --- 플로팅 버튼 --- */}
       {user && !user.is_admin && (
         <button onClick={() => setIsMailFormOpen(true)} className="fixed bottom-12 right-12 w-16 h-16 bg-red-950 rounded-full flex items-center justify-center text-3xl shadow-[0_0_30px_rgba(153,27,27,0.4)] border border-red-700 hover:scale-110 active:scale-90 transition-all z-40 group">
           <span className="group-hover:animate-bounce">💬</span>
