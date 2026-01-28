@@ -291,7 +291,7 @@ function App() {
 {/* --- [수정] 메인 컨텐츠 영역: 다중 조건부 렌더링 --- */}
       <div>
         {view === 'home' && (
-          <main className="flex flex-col items-center justify-center pt-60 text-center px-6 animate-in fade-in zoom-in-95 duration-1000">
+            <main key="shop-view" className="max-w-7xl mx-auto pt-24 px-8 pb-32 animate-in slide-in-from-bottom-8 duration-700">
             <h1 className="text-[90px] font-black text-white italic tracking-tighter leading-none mb-6 uppercase">"Arena Never Sleeps"</h1>
             <div className="w-24 h-[1px] bg-red-900 mb-8"></div>
             <p className="text-zinc-700 italic text-xl tracking-[0.3em] uppercase">The victory is the only record.</p>
@@ -335,11 +335,16 @@ function App() {
           </main>
         )}
 
-        {/* 3. 주식 시장 화면 */}
-        {view === 'stock' && (
-          <div className="animate-in slide-in-from-bottom-12 duration-700 slide-in-from-bottom-full">
-            <window.StockMarket user={user} fetchUserList={fetchUserList} />
-          </div>
+          {view === 'stock' && (
+          <main key="stock-view" className="max-w-7xl mx-auto pt-24 px-8 pb-32 animate-in slide-in-from-bottom-12 duration-700">
+            {window.StockMarket ? (
+              <window.StockMarket user={user} fetchUserList={fetchUserList} />
+            ) : (
+              <div className="flex items-center justify-center h-[400px] text-red-900 font-black italic text-2xl animate-pulse uppercase tracking-[0.3em]">
+                Initializing Trading Systems...
+              </div>
+            )}
+          </main>
         )}
       </div>
 
