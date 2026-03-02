@@ -17,9 +17,10 @@ const StockMarket = ({ user, fetchUserList }) => {
     const now = new Date();
     const hour = now.getHours();
     // 요일 조건: 금(5), 토(6), 일(0)
-  const isCorrectDay = (day === 5 || day === 6 || day === 0);
-  // 시간 조건: 19:00 ~ 익일 02:00
-    return hour >= 19 || hour < 2;
+    const isCorrectDay = (day === 5 || day === 6 || day === 0);
+    // 시간 조건: 19:00 ~ 익일 02:00
+    const isCorrectTime = (hour >= 19 || hour < 2);
+    return isCorrectDay && isCorrectTime;
   };
 
   const fetchMarketData = async () => {
