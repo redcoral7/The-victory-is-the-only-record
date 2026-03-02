@@ -16,7 +16,7 @@ const StockMarket = ({ user, fetchUserList }) => {
   const checkMarketStatus = () => {
     const now = new Date();
     const hour = now.getHours();
-    return hour >= 9 || hour < 2;
+    return hour >= 19 || hour < 2;
   };
 
   const fetchMarketData = async () => {
