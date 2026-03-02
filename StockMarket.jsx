@@ -1,7 +1,6 @@
 const { useState, useEffect, useRef } = React;
 
 const StockMarket = ({ user, fetchUserList }) => {
-  // Hook 설정 (최상단 배치)
   const [stocks, setStocks] = useState([]);
   const [myStocks, setMyStocks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -11,15 +10,19 @@ const StockMarket = ({ user, fetchUserList }) => {
   const [sellQtys, setSellQtys] = useState({});
   const [candleHistory, setCandleHistory] = useState({});
   
-  const workerRef = useRef(null); // 백그라운드 실행용 워커 참조
+  const workerRef = useRef(null);
 
+  // 🔴 요일과 시간을 모두 체크하는 핵심 로직 (수정됨)
   const checkMarketStatus = () => {
     const now = new Date();
+    const day = now.getDay(); // 0: 일, 1: 월, ..., 5: 금, 6: 토
     const hour = now.getHours();
-    // 요일 조건: 금(5), 토(6), 일(0)
+
+    // 요일 체크: 금(5), 토(6), 일(0)
     const isCorrectDay = (day === 5 || day === 6 || day === 0);
-    // 시간 조건: 19:00 ~ 익일 02:00
+    // 시간 체크: 19:00 ~ 02:00 (익일 새벽 2시까지)
     const isCorrectTime = (hour >= 19 || hour < 2);
+
     return isCorrectDay && isCorrectTime;
   };
 
@@ -61,18 +64,20 @@ const StockMarket = ({ user, fetchUserList }) => {
   useEffect(() => {
     if (!user) return;
 
+    // 초기 실행 시 상태 체크
     const openStatus = checkMarketStatus();
     setIsMarketOpen(openStatus);
 
+    // 1분마다 시장 개장 상태를 체크하여 화면을 자동 전환
+    const statusInterval = setInterval(() => {
+      setIsMarketOpen(checkMarketStatus());
+    }, 60000);
+
     if (openStatus) {
       fetchMarketData();
-      
-      // 1. 공통 시세 읽기 (5초)
       const fetchInterval = setInterval(fetchMarketData, 5000);
 
-      // 2. 관리자 전용: 백그라운드 업데이트 워커 가동
       if (user?.is_admin) {
-        // 백그라운드에서 멈추지 않는 별도 쓰레드 생성
         const workerCode = `
           setInterval(() => {
             postMessage('tick');
@@ -82,7 +87,6 @@ const StockMarket = ({ user, fetchUserList }) => {
         workerRef.current = new Worker(URL.createObjectURL(blob));
 
         workerRef.current.onmessage = async () => {
-          // 이 영역은 탭이 비활성화되어도 5초마다 실행됩니다.
           const { data: currentStocks } = await supabaseClient.from('stocks').select('*');
           if (!currentStocks) return;
 
@@ -94,21 +98,22 @@ const StockMarket = ({ user, fetchUserList }) => {
               change_rate: changePercent 
             }).eq('id', stock.id);
           }
-          console.log("Admin Background Update Sync Success");
         };
       }
 
       return () => {
         clearInterval(fetchInterval);
+        clearInterval(statusInterval);
         if (workerRef.current) workerRef.current.terminate();
       };
     }
+    return () => clearInterval(statusInterval);
   }, [user?.code, user?.is_admin, isMarketOpen]);
 
-  // 로그인 체크 UI
+  // 1️⃣ 로그인하지 않은 경우 화면
   if (!user) {
     return (
-      <div className="min-h-[80vh] flex flex-col items-center justify-center text-center px-6">
+      <div className="min-h-[80vh] flex flex-col items-center justify-center text-center px-6 animate-in fade-in duration-700">
         <h2 className="text-8xl font-black text-white italic tracking-tighter uppercase mb-4 opacity-10">Access Denied</h2>
         <h3 className="text-4xl font-black text-red-600 italic tracking-tighter uppercase mb-6">Authentication Required</h3>
         <p className="text-zinc-600 font-bold tracking-[0.3em] uppercase text-sm mb-12">로그인 후 이용 가능합니다.</p>
@@ -116,6 +121,20 @@ const StockMarket = ({ user, fetchUserList }) => {
     );
   }
 
+  // 2️⃣ 시장 운영 시간이 아닐 때 나오는 화면 (핵심!)
+  if (!isMarketOpen) {
+    return (
+      <div className="min-h-[80vh] flex flex-col items-center justify-center text-center px-6 animate-in zoom-in-95 duration-700">
+        <h2 className="text-8xl font-black text-white italic tracking-tighter uppercase mb-4 opacity-10">Closed</h2>
+        <h3 className="text-4xl font-black text-red-600 italic tracking-tighter uppercase mb-6">Market is Closed</h3>
+        <div className="w-16 h-[1px] bg-red-900 mb-8"></div>
+        <p className="text-zinc-400 font-bold tracking-[0.3em] uppercase text-sm mb-2">운영 시간 가이드</p>
+        <p className="text-zinc-600 font-medium tracking-[0.1em] text-lg mb-12 uppercase italic">Every Fri / Sat / Sun <br/> 19:00 - 02:00 (KST)</p>
+      </div>
+    );
+  }
+
+  // 3️⃣ 시장이 열렸을 때의 메인 UI
   const handleQtyInput = (id, val, setter) => {
     const num = parseInt(val) || 1;
     setter(prev => ({ ...prev, [id]: num }));
@@ -182,23 +201,12 @@ const StockMarket = ({ user, fetchUserList }) => {
     );
   };
 
-  if (!isMarketOpen) {
-    return (
-      <div className="min-h-[80vh] flex flex-col items-center justify-center text-center px-6">
-        <h2 className="text-8xl font-black text-white italic tracking-tighter uppercase mb-4 opacity-10">Closed</h2>
-        <h3 className="text-4xl font-black text-red-600 italic tracking-tighter uppercase mb-6">Market is Closed</h3>
-        <p className="text-zinc-600 font-bold tracking-[0.3em] uppercase text-sm mb-12">운영 시간: 金/土/日 19:00 - 02:00</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-7xl mx-auto pt-24 px-8 pb-32">
+    <div className="max-w-7xl mx-auto pt-24 px-8 pb-32 animate-in slide-in-from-bottom-12 duration-1000">
       <div className="flex justify-between items-end mb-16 border-l-4 border-red-900 pl-8 py-2">
         <div>
           <h2 className="text-6xl font-black text-white italic tracking-tighter uppercase mb-2">Exchange</h2>
           <p className="text-red-900 font-black tracking-[0.5em] text-[10px] uppercase animate-pulse mt-2">● System Active</p>
-          {user?.is_admin && <p className="text-red-500 text-[8px] font-black mt-2 uppercase tracking-widest">Worker Sync: 5s / Background Alive</p>}
         </div>
         <div className="text-right">
           <span className="text-zinc-600 text-[10px] uppercase font-black block mb-2 tracking-widest">Available Balance</span>
@@ -207,6 +215,7 @@ const StockMarket = ({ user, fetchUserList }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        {/* 주식 리스트 */}
         <div className="lg:col-span-2 space-y-4">
           {stocks.map(stock => (
             <div key={stock.id} className="bg-[#050505] border border-zinc-900 p-8 flex items-center justify-between group hover:border-red-600 transition-all duration-300">
@@ -232,6 +241,7 @@ const StockMarket = ({ user, fetchUserList }) => {
           ))}
         </div>
 
+        {/* 내 포트폴리오 */}
         <div className="bg-[#050505] border border-zinc-900 p-8 h-fit">
           <h3 className="text-zinc-700 font-black text-[11px] tracking-[0.4em] uppercase mb-8 italic">Your Portfolio</h3>
           {myStocks.length > 0 ? myStocks.map(ms => {
@@ -256,7 +266,7 @@ const StockMarket = ({ user, fetchUserList }) => {
                 </div>
               </div>
             );
-          }) : <div className="text-center py-20 text-zinc-800 text-[10px] uppercase tracking-widest leading-loose border border-dashed border-zinc-900">No Assets Held</div>}
+          }) : <div className="text-center py-20 text-zinc-800 text-[10px] uppercase tracking-widest border border-dashed border-zinc-900">No Assets Held</div>}
         </div>
       </div>
     </div>
